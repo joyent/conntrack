@@ -267,6 +267,18 @@ func (f Flow) marshal() ([]netfilter.Attribute, error) {
 		attrs = append(attrs, f.SynProxy.marshal())
 	}
 
+	if len(f.Labels) > 0 {
+		a := netfilter.Attribute{Type: uint16(ctaLabels)}
+		a.Data = f.Labels
+		attrs = append(attrs, a)
+	}
+
+	if len(f.LabelsMask) > 0 {
+		a := netfilter.Attribute{Type: uint16(ctaLabelsMask)}
+		a.Data = f.LabelsMask
+		attrs = append(attrs, a)
+	}
+
 	return attrs, nil
 }
 

@@ -34,6 +34,16 @@ func (t Tuple) filled() bool {
 
 // String returns a string representation of a Tuple.
 func (t Tuple) String() string {
+	if t.Proto.Protocol == unix.IPPROTO_ICMP {
+		return fmt.Sprintf("<%s, Src: %s, Dst: %s, icmp: id=%d, type=%d, code=%d>",
+			protoLookup(t.Proto.Protocol),
+			t.IP.SourceAddress.String(),
+			t.IP.DestinationAddress.String(),
+			t.Proto.ICMPID,
+			t.Proto.ICMPType,
+			t.Proto.ICMPCode)
+	}
+
 	return fmt.Sprintf("<%s, Src: %s, Dst: %s>",
 		protoLookup(t.Proto.Protocol),
 		net.JoinHostPort(t.IP.SourceAddress.String(), strconv.Itoa(int(t.Proto.SourcePort))),

@@ -16,6 +16,9 @@ generate:
 test:
 	go test -race ./...
 
+label:
+	sudo go test -v -run TestLabel
+
 .PHONY: testv
 testv:
 	go test -v -race ./...

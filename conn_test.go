@@ -1,10 +1,12 @@
 package conntrack_test
 
 import (
+	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/mdlayher/netlink"
 	"github.com/stretchr/testify/assert"
@@ -213,4 +215,96 @@ func ExampleConn_listen() {
 
 	// Stop the program as soon as an error is caught in a decoder goroutine.
 	log.Print(<-errCh)
+}
+
+func TestLabel(t *testing.T) {
+	// Open a Conntrack connection.
+	c, err := conntrack.Dial(nil)
+	if err != nil {
+		log.Fatalf("1. %s", err)
+	}
+
+	// Dump all records in the Conntrack table that match the filter's mark/mask.
+	df, err := c.Dump(nil)
+	if err != nil {
+		log.Fatalf("2. %s", err)
+	}
+
+	var uf conntrack.Flow
+	var found bool
+
+	for i, f := range df {
+		if f.TupleOrig.Proto.Protocol == 6 &&
+			f.TupleOrig.Proto.DestinationPort == 22 {
+			uf = f
+			fmt.Printf("### 1. %d: flow:%+v \n", i, f)
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		fmt.Printf("### 2. not selected flow \n")
+	}
+
+	fmt.Printf("### 2. selected flow:%+v \n", uf)
+
+	// get a single flow
+	// Set up a new Flow object using a given set of attributes.
+	src := uf.TupleOrig.IP.SourceAddress.String()
+	dst := uf.TupleOrig.IP.DestinationAddress.String()
+	mark := uint32(1111)
+
+	timestamp := uint32(time.Now().Unix())
+	fmt.Printf("%d \n", timestamp)
+
+	f := conntrack.NewFlow(
+		uf.TupleOrig.Proto.Protocol,
+		0,
+		net.ParseIP(src),
+		net.ParseIP(dst),
+		uf.TupleOrig.Proto.SourcePort,
+		uf.TupleOrig.Proto.DestinationPort,
+		0,
+		mark)
+
+	f.TupleOrig.Proto.ICMPv4 = uf.TupleOrig.Proto.ICMPv4
+	f.TupleOrig.Proto.ICMPID = uf.TupleOrig.Proto.ICMPID
+	f.TupleOrig.Proto.ICMPType = uf.TupleOrig.Proto.ICMPType
+
+	//////////////////////
+	// update label
+
+	f.Labels = make([]byte, 16)
+	f.LabelsMask = make([]byte, 16)
+
+	binary.BigEndian.PutUint32(f.Labels[0:4], timestamp)
+	binary.BigEndian.PutUint32(f.LabelsMask[0:4], ^uint32(0))
+
+	if false {
+		f.Labels[10] = 99
+		f.Labels[11] = 88
+		f.LabelsMask[10] = 0xff
+		f.LabelsMask[11] = 0xff
+	}
+
+	fmt.Printf("### 3. Labels: %+v \n", f.Labels)
+	fmt.Printf("### 3.   mask: %+v \n", f.LabelsMask)
+
+	// update
+	err = c.Update(f)
+	if err != nil {
+		log.Fatalf("3. %s", err)
+	}
+
+	////////////////////////
+
+	// Query the kernel based on the Flow's source/destination tuples.
+	// Returns a new Flow object with its connection ID assigned by the kernel.
+	qf, err := c.Get(f)
+	if err != nil {
+		log.Fatalf("4. %s", err)
+	}
+
+	fmt.Printf("### 3. get flow:%+v \n", qf)
 }
