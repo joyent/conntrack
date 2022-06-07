@@ -19,6 +19,9 @@ test:
 label:
 	sudo go test -v -run TestLabel
 
+dump:
+	sudo go test -v -run TestDump
+
 .PHONY: testv
 testv:
 	go test -v -race ./...
@@ -52,6 +55,9 @@ coverhtml-integration: integration
 .PHONY: bench
 bench:
 	go test -bench=. ./...
+
+ben:
+	sudo go test -tags=integration -bench=Msg -count 5
 
 .PHONY: bench-integration
 bench-integration: modprobe

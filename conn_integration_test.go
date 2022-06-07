@@ -1,16 +1,17 @@
-//+build integration
-
 package conntrack
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ti-mo/netfilter"
 
 	"github.com/mdlayher/netlink"
 	"github.com/vishvananda/netns"
@@ -121,4 +122,56 @@ func findKsym(sym string) bool {
 	}
 
 	return false
+}
+
+/////////////////////////
+
+func testMarshal(f Flow) error {
+	attrs, err := f.marshal()
+	if err != nil {
+		return err
+	}
+
+	pf := netfilter.ProtoIPv4
+	if f.TupleOrig.IP.IsIPv6() && f.TupleReply.IP.IsIPv6() {
+		pf = netfilter.ProtoIPv6
+	}
+
+	req, err := netfilter.MarshalNetlink(
+		netfilter.Header{
+			SubsystemID: netfilter.NFSubsysCTNetlink,
+			MessageType: netfilter.MessageType(ctNew),
+			Family:      pf,
+			Flags:       netlink.Request | netlink.Acknowledge,
+		}, attrs)
+
+	if err != nil {
+		return err
+	}
+	_ = req
+
+	return nil
+}
+
+func BenchmarkMsg(b *testing.B) {
+	src := net.ParseIP("1.1.1.1")
+	dst := net.ParseIP("1.1.1.1")
+	sp := uint16(2222)
+	dp := uint16(22)
+
+	f := NewFlow(
+		6, 0,
+		src, dst,
+		sp, dp,
+		0, 0)
+
+	f.Labels = make([]byte, 16)
+	f.LabelsMask = make([]byte, 16)
+	binary.LittleEndian.PutUint32(f.Labels[0:4], 1)
+	binary.LittleEndian.PutUint32(f.LabelsMask[0:4], ^uint32(0))
+
+	// update
+	for i := 0; i < b.N; i++ {
+		testMarshal(f)
+	}
 }

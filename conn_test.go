@@ -308,3 +308,25 @@ func TestLabel(t *testing.T) {
 
 	fmt.Printf("### 3. get flow:%+v \n", qf)
 }
+
+func TestDump(t *testing.T) {
+	// Open a Conntrack connection.
+	c, err := conntrack.Dial(nil)
+	if err != nil {
+		log.Fatalf("1. %s", err)
+	}
+
+	// Dump all records in the Conntrack table that match the filter's mark/mask.
+	df, err := c.Dump(nil)
+	if err != nil {
+		log.Fatalf("2. %s", err)
+	}
+
+	var i int
+	for _, f := range df {
+		if f.TupleOrig.Proto.Protocol == 1 {
+			i++
+			fmt.Printf("### %d: flow:%+v \n", i, f)
+		}
+	}
+}
