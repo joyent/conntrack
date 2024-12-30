@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -327,6 +328,167 @@ func TestDump(t *testing.T) {
 		if f.TupleOrig.Proto.Protocol == 1 {
 			i++
 			fmt.Printf("### %d: flow:%+v \n", i, f)
+		}
+	}
+}
+
+func testDump1(t *testing.T) {
+	// Open a Conntrack connection.
+	log.Printf("start dump...\n")
+	c, err := conntrack.Dial(nil)
+	if err != nil {
+		log.Fatalf("1. %s", err)
+	}
+
+	dumpCt(c)
+}
+
+func dumpCt(c *conntrack.Conn) {
+
+	// Dump all records in the Conntrack table that match the filter's mark/mask.
+	df, err := c.Dump(nil)
+	if err != nil {
+		log.Fatalf("2. %s", err)
+	}
+
+	//log.Printf("length=%d \n", len(df))
+
+	for i, f := range df {
+		var proto *conntrack.ProtoInfoTCP
+
+		if f.ProtoInfo.TCP != nil &&
+			//f.TupleOrig.IP.DestinationAddress == netip.MustParseAddr("37.153.118.121") {
+			f.TupleOrig.IP.DestinationAddress == netip.MustParseAddr("1.1.1.100") {
+			proto = f.ProtoInfo.TCP
+		} else {
+			//fmt.Printf("### %d: flow:%+v \n", i, f)
+			continue
+		}
+
+		fmt.Printf("### %d: before: flow:%+v, tcp=%+v, flag=0x%x \n", i, f, *proto, proto.OriginalFlags)
+
+		proto.State = 2
+		proto.OriginalFlags |= 0x800
+
+		fmt.Printf("### %d: after: flow:%+v, tcp=%+v, flag=0x%x \n", i, f, *proto, proto.OriginalFlags)
+
+		// Update the Flow's timeout to 240 seconds.
+		err = c.Update(f)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Query the kernel based on the Flow's source/destination tuples.
+		// Returns a new Flow object with its connection ID assigned by the kernel.
+		qf, err := c.Get(f)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		proto = qf.ProtoInfo.TCP
+		fmt.Printf("### %d: tcp=%+v \n", i, *proto)
+
+	}
+}
+
+func updateCt(conn *conntrack.Conn, uf *conntrack.Flow) {
+	if uf.Status.Value&conntrack.StatusSeenReply != 0 {
+		// already syn_recved
+		return
+	} else if uf.ProtoInfo.TCP == nil {
+		// only tcp
+		return
+	} else if uf.Zone < uint16(100) || uint16(2100) < uf.Zone {
+		// not NLB Traffic
+		return
+	}
+
+	fmt.Printf("### 1.New event: %+v, Zone=%d, ProtoInfo=%+v \n",
+		uf, uf.Zone, uf.ProtoInfo.TCP)
+
+	f := conntrack.NewFlow(
+		uf.TupleOrig.Proto.Protocol,
+		uf.Status.Value|conntrack.StatusSeenReply|conntrack.StatusAssured,
+		uf.TupleOrig.IP.SourceAddress,
+		uf.TupleOrig.IP.DestinationAddress,
+		uf.TupleOrig.Proto.SourcePort,
+		uf.TupleOrig.Proto.DestinationPort,
+		0,
+		uf.Mark)
+
+	/*
+		f.TupleOrig.Proto.ICMPv4 = uf.TupleOrig.Proto.ICMPv4
+		f.TupleOrig.Proto.ICMPID = uf.TupleOrig.Proto.ICMPID
+		f.TupleOrig.Proto.ICMPType = uf.TupleOrig.Proto.ICMPType
+	*/
+
+	// 0x0800
+	// value & mask
+	var flags uint16 = 0x0808
+	f.Zone = uf.Zone
+	f.ProtoInfo.TCP = uf.ProtoInfo.TCP
+	f.ProtoInfo.TCP.State = 2
+	f.ProtoInfo.TCP.OriginalFlags |= flags
+	f.ProtoInfo.TCP.ReplyFlags |= flags
+
+	fmt.Printf("### 2.Update conntrack: %s:%d->%s:%d(%d), Zone(OvsPortId)=%d, ProtoInfo=%+v \n",
+		uf.TupleOrig.IP.SourceAddress,
+		uf.TupleOrig.Proto.SourcePort,
+		uf.TupleOrig.IP.DestinationAddress,
+		uf.TupleOrig.Proto.DestinationPort,
+		uf.TupleOrig.Proto.Protocol,
+		uf.Zone,
+		f.ProtoInfo.TCP)
+
+	err := conn.Update(f)
+	if err != nil {
+		fmt.Printf("failed to update: err=%s \n", err)
+	}
+
+	// Query the kernel based on the Flow's source/destination tuples.
+	// Returns a new Flow object with its connection ID assigned by the kernel.
+	qf, err := conn.Get(f)
+	if err != nil {
+		fmt.Printf("failed to get ct: err=%s \n", err)
+	}
+
+	fmt.Printf("### 3.Updated CT: %+v, ### ProtoInfo=%+v \n", qf, qf.ProtoInfo.TCP)
+}
+
+func testUpdate(t *testing.T) {
+	fmt.Printf("Start TestMain\n")
+
+	eventConn, err := conntrack.Dial(nil)
+	if err != nil {
+		fmt.Printf("unexpected error dialing namespaced connection: %s \n", err)
+		return
+	}
+	defer eventConn.Close()
+
+	// Open a Conntrack connection.
+	conn, err := conntrack.Dial(nil)
+	if err != nil {
+		log.Fatalf("failed to connect netlink: err=%s \n", err)
+		return
+	}
+	defer conn.Close()
+
+	// Subscribe to new/update conntrack events using a single worker.
+	ev := make(chan conntrack.Event)
+	errChan, err := eventConn.Listen(ev, 1, []netfilter.NetlinkGroup{
+		netfilter.GroupCTNew,
+		//netfilter.GroupCTUpdate,
+		//netfilter.GroupCTDestroy,
+	})
+
+	for {
+		select {
+		case <-errChan:
+		case e := <-ev:
+			if e.Type == conntrack.EventNew && e.Flow != nil {
+				//fmt.Printf("new event: %+v\n", e.Flow)
+				updateCt(conn, e.Flow)
+			}
 		}
 	}
 }
