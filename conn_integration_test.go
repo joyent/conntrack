@@ -1,3 +1,5 @@
+//go:build integration
+
 package conntrack
 
 import (
@@ -20,13 +22,11 @@ import (
 var ksyms []string
 
 func TestMain(m *testing.M) {
-
-	var err error
-
-	if err = checkKmod(); err != nil {
+	if err := checkKmod(); err != nil {
 		log.Fatal(err)
 	}
 
+	var err error
 	ksyms, err = getKsyms()
 	if err != nil {
 		log.Fatal(err)
@@ -38,7 +38,6 @@ func TestMain(m *testing.M) {
 
 // Open a Netlink socket and set an option on it.
 func TestConnDialSetOption(t *testing.T) {
-
 	c, err := Dial(nil)
 	require.NoError(t, err, "opening Conn")
 
@@ -53,7 +52,6 @@ func TestConnDialSetOption(t *testing.T) {
 // Since around 4.19, conntrack is a single module, so only warn about _ipv4/6 when that one
 // is not loaded.
 func checkKmod() error {
-
 	kmods := []string{
 		"nf_conntrack_ipv4",
 		"nf_conntrack_ipv6",
@@ -74,7 +72,6 @@ func checkKmod() error {
 // makeNSConn creates a Conn in a new network namespace to use for testing.
 // Returns the Conn, the netns identifier and error.
 func makeNSConn() (*Conn, int, error) {
-
 	newns, err := netns.New()
 	if err != nil {
 		return nil, 0, fmt.Errorf("unexpected error creating network namespace: %s", err)
@@ -90,7 +87,6 @@ func makeNSConn() (*Conn, int, error) {
 
 // getKsyms gets a list of all symbols in the kernel. (/proc/kallsyms)
 func getKsyms() ([]string, error) {
-
 	f, err := ioutil.ReadFile("/proc/kallsyms")
 	if err != nil {
 		return nil, err
@@ -101,7 +97,6 @@ func getKsyms() ([]string, error) {
 	out := make([]string, len(content))
 
 	for i, l := range content {
-
 		// Replace any tabs by spaces
 		l = strings.Replace(l, "\t", " ", -1)
 
@@ -114,7 +109,6 @@ func getKsyms() ([]string, error) {
 
 // findKsym finds a given string in /proc/kallsyms. True means the string was found.
 func findKsym(sym string) bool {
-
 	for _, v := range ksyms {
 		if v == sym {
 			return true

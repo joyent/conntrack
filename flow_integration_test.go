@@ -1,18 +1,15 @@
-//+build integration
+//go:build integration
 
 package conntrack
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/mdlayher/netlink"
 )
 
 // Create a given number of flows with a randomized component and check the amount
@@ -38,7 +35,7 @@ func TestConnCreateFlows(t *testing.T) {
 
 	// Create IPv4 flows
 	for i := 1; i <= numFlows; i++ {
-		f = NewFlow(6, 0, net.IPv4(1, 2, 3, 4), net.IPv4(5, 6, 7, 8), 1234, uint16(i), 120, 0)
+		f = NewFlow(6, 0, netip.MustParseAddr("1.2.3.4"), netip.MustParseAddr("5.6.7.8"), 1234, uint16(i), 120, 0)
 
 		err = c.Create(f)
 		require.NoError(t, err, "creating IPv4 flow", i)
@@ -48,8 +45,8 @@ func TestConnCreateFlows(t *testing.T) {
 	for i := 1; i <= numFlows; i++ {
 		err = c.Create(NewFlow(
 			17, 0,
-			net.ParseIP("2a00:1450:400e:804::200e"),
-			net.ParseIP("2a00:1450:400e:804::200f"),
+			netip.MustParseAddr("2a00:1450:400e:804::200e"),
+			netip.MustParseAddr("2a00:1450:400e:804::200f"),
 			1234, uint16(i), 120, 0,
 		))
 		require.NoError(t, err, "creating IPv6 flow", i)
@@ -68,7 +65,7 @@ func TestConnCreateError(t *testing.T) {
 	require.NoError(t, err)
 
 	err = c.Create(Flow{Timeout: 0})
-	require.EqualError(t, err, errNeedTimeout.Error())
+	require.ErrorIs(t, err, errNeedTimeout)
 }
 
 func TestConnFlush(t *testing.T) {
@@ -84,8 +81,8 @@ func TestConnFlush(t *testing.T) {
 	// Create IPv4 flow
 	err = c.Create(NewFlow(
 		6, 0,
-		net.IPv4(1, 2, 3, 4),
-		net.IPv4(5, 6, 7, 8),
+		netip.MustParseAddr("1.2.3.4"),
+		netip.MustParseAddr("5.6.7.8"),
 		1234, 80, 120, 0,
 	))
 	require.NoError(t, err, "creating IPv4 flow")
@@ -93,8 +90,8 @@ func TestConnFlush(t *testing.T) {
 	// Create IPv6 flow
 	err = c.Create(NewFlow(
 		17, 0,
-		net.ParseIP("2a00:1450:400e:804::200e"),
-		net.ParseIP("2a00:1450:400e:804::200f"),
+		netip.MustParseAddr("2a00:1450:400e:804::200e"),
+		netip.MustParseAddr("2a00:1450:400e:804::200f"),
 		1234, 80, 120, 0,
 	))
 	require.NoError(t, err, "creating IPv6 flow")
@@ -133,8 +130,8 @@ func TestConnFlushFilter(t *testing.T) {
 	// Create IPv4 flow
 	err = c.Create(NewFlow(
 		6, 0,
-		net.IPv4(1, 2, 3, 4),
-		net.IPv4(5, 6, 7, 8),
+		netip.MustParseAddr("1.2.3.4"),
+		netip.MustParseAddr("5.6.7.8"),
 		1234, 80, 120, 0,
 	))
 	require.NoError(t, err, "creating IPv4 flow")
@@ -142,8 +139,8 @@ func TestConnFlushFilter(t *testing.T) {
 	// Create IPv6 flow with mark
 	err = c.Create(NewFlow(
 		17, 0,
-		net.ParseIP("2a00:1450:400e:804::200e"),
-		net.ParseIP("2a00:1450:400e:804::200f"),
+		netip.MustParseAddr("2a00:1450:400e:804::200e"),
+		netip.MustParseAddr("2a00:1450:400e:804::200f"),
 		1234, 80, 120, 0xff00,
 	))
 	require.NoError(t, err, "creating IPv6 flow")
@@ -177,8 +174,8 @@ func TestConnCreateDeleteFlows(t *testing.T) {
 	for i := 1; i <= numFlows; i++ {
 		f = NewFlow(
 			17, 0,
-			net.ParseIP("2a00:1450:400e:804::223e"),
-			net.ParseIP("2a00:1450:400e:804::223f"),
+			netip.MustParseAddr("2a00:1450:400e:804::223e"),
+			netip.MustParseAddr("2a00:1450:400e:804::223f"),
 			1234, uint16(i), 120, 0,
 		)
 
@@ -197,14 +194,13 @@ func TestConnCreateDeleteFlows(t *testing.T) {
 
 // Creates a flow, updates it and checks the result.
 func TestConnCreateUpdateFlow(t *testing.T) {
-
 	c, _, err := makeNSConn()
 	require.NoError(t, err)
 
 	f := NewFlow(
 		17, 0,
-		net.ParseIP("1.2.3.4"),
-		net.ParseIP("5.6.7.8"),
+		netip.MustParseAddr("1.2.3.4"),
+		netip.MustParseAddr("5.6.7.8"),
 		1234, 5678, 120, 0,
 	)
 
@@ -266,15 +262,15 @@ func TestConnUpdateError(t *testing.T) {
 
 	f := NewFlow(
 		17, 0,
-		net.ParseIP("1.2.3.4"),
-		net.ParseIP("5.6.7.8"),
+		netip.MustParseAddr("1.2.3.4"),
+		netip.MustParseAddr("5.6.7.8"),
 		1234, 5678, 120, 0,
 	)
 
 	f.TupleMaster = f.TupleOrig
 
 	err = c.Update(f)
-	require.EqualError(t, err, errUpdateMaster.Error())
+	require.ErrorIs(t, err, errUpdateMaster)
 }
 
 // Creates IPv4 and IPv6 flows and queries them using a simple get.
@@ -284,18 +280,15 @@ func TestConnCreateGetFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	flows := map[string]Flow{
-		"v4m1": NewFlow(17, 0, net.ParseIP("1.2.3.4"), net.ParseIP("5.6.7.8"), 1234, 5678, 120, 0),
-		"v4m2": NewFlow(17, 0, net.ParseIP("10.0.0.1"), net.ParseIP("10.0.0.2"), 24000, 80, 120, 0),
-		"v6m1": NewFlow(17, 0, net.ParseIP("2a12:1234:200f:600::200a"), net.ParseIP("2a12:1234:200f:600::200b"), 6554, 53, 120, 0),
-		"v6m2": NewFlow(17, 0, net.ParseIP("900d:f00d:24::7"), net.ParseIP("baad:beef:b00::b00"), 1323, 22, 120, 0),
+		"v4m1": NewFlow(17, 0, netip.MustParseAddr("1.2.3.4"), netip.MustParseAddr("5.6.7.8"), 1234, 5678, 120, 0),
+		"v4m2": NewFlow(17, 0, netip.MustParseAddr("10.0.0.1"), netip.MustParseAddr("10.0.0.2"), 24000, 80, 120, 0),
+		"v6m1": NewFlow(17, 0, netip.MustParseAddr("2a12:1234:200f:600::200a"), netip.MustParseAddr("2a12:1234:200f:600::200b"), 6554, 53, 120, 0),
+		"v6m2": NewFlow(17, 0, netip.MustParseAddr("900d:f00d:24::7"), netip.MustParseAddr("baad:beef:b00::b00"), 1323, 22, 120, 0),
 	}
 
 	for n, f := range flows {
 		_, err := c.Get(f)
-
-		opErr, ok := errors.Cause(err).(*netlink.OpError)
-		require.True(t, ok)
-		require.EqualError(t, opErr.Err, unix.ENOENT.Error(), "get flow before creating")
+		require.ErrorIs(t, err, unix.ENOENT, "get flow before creating")
 
 		err = c.Create(f)
 		require.NoError(t, err, "creating flow", n)
@@ -313,7 +306,7 @@ func TestDumpZero(t *testing.T) {
 	c, _, err := makeNSConn()
 	require.NoError(t, err)
 
-	f := NewFlow(17, 0, net.ParseIP("1.2.3.4"), net.ParseIP("5.6.7.8"), 1234, 5678, 120, 0xff000000)
+	f := NewFlow(17, 0, netip.MustParseAddr("1.2.3.4"), netip.MustParseAddr("5.6.7.8"), 1234, 5678, 120, 0xff000000)
 
 	f.CountersOrig.Bytes = 1337
 	f.CountersReply.Bytes = 9001
@@ -339,10 +332,10 @@ func TestConnDumpFilter(t *testing.T) {
 	require.NoError(t, err)
 
 	flows := map[string]Flow{
-		"v4m1": NewFlow(17, 0, net.ParseIP("1.2.3.4"), net.ParseIP("5.6.7.8"), 1234, 5678, 120, 0xff000000),
-		"v4m2": NewFlow(17, 0, net.ParseIP("10.0.0.1"), net.ParseIP("10.0.0.2"), 24000, 80, 120, 0x00ff0000),
-		"v6m1": NewFlow(17, 0, net.ParseIP("2a12:1234:200f:600::200a"), net.ParseIP("2a12:1234:200f:600::200b"), 6554, 53, 120, 0x0000ff00),
-		"v6m2": NewFlow(17, 0, net.ParseIP("900d:f00d:24::7"), net.ParseIP("baad:beef:b00::b00"), 1323, 22, 120, 0x000000ff),
+		"v4m1": NewFlow(17, 0, netip.MustParseAddr("1.2.3.4"), netip.MustParseAddr("5.6.7.8"), 1234, 5678, 120, 0xff000000),
+		"v4m2": NewFlow(17, 0, netip.MustParseAddr("10.0.0.1"), netip.MustParseAddr("10.0.0.2"), 24000, 80, 120, 0x00ff0000),
+		"v6m1": NewFlow(17, 0, netip.MustParseAddr("2a12:1234:200f:600::200a"), netip.MustParseAddr("2a12:1234:200f:600::200b"), 6554, 53, 120, 0x0000ff00),
+		"v6m2": NewFlow(17, 0, netip.MustParseAddr("900d:f00d:24::7"), netip.MustParseAddr("baad:beef:b00::b00"), 1323, 22, 120, 0x000000ff),
 	}
 
 	// Expect empty result from empty table dump
@@ -379,7 +372,7 @@ func BenchmarkCreateDeleteFlow(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	f := NewFlow(6, 0, net.IPv4(1, 2, 3, 4), net.IPv4(5, 6, 7, 8), 1234, 80, 120, 0)
+	f := NewFlow(6, 0, netip.MustParseAddr("1.2.3.4"), netip.MustParseAddr("5.6.7.8"), 1234, 80, 120, 0)
 
 	for n := 0; n < b.N; n++ {
 		err = c.Create(f)

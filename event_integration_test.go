@@ -1,65 +1,59 @@
-//+build integration
+//go:build integration
 
 package conntrack
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 
-	"github.com/pkg/errors"
-
+	"github.com/mdlayher/netlink"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 
-	"github.com/mdlayher/netlink"
 	"github.com/ti-mo/netfilter"
 )
 
 func TestConnListen(t *testing.T) {
-
-	// Dial a send connection to Netlink in a new namespace
+	// Dial a send connection to Netlink in a new namespace.
 	sc, nsid, err := makeNSConn()
 	require.NoError(t, err)
 
-	// Create a listener connection in the same namespace
+	// Create a listener connection in the same namespace.
 	lc, err := Dial(&netlink.Config{NetNS: nsid})
 	require.NoError(t, err)
 
-	// This needs to be an unbuffered channel with a single producer worker. Multicast connections
-	// currently cannot be terminated gracefully when stuck in Receive(), so we have to inject an event
-	// ourselves, while making sure the worker exits before re-entering Receive().
+	// Subscribe to new/update conntrack events using a single worker.
 	ev := make(chan Event)
-	errChan, err := lc.Listen(ev, 1, []netfilter.NetlinkGroup{netfilter.GroupCTNew, netfilter.GroupCTUpdate})
+	errChan, err := lc.Listen(ev, 1, []netfilter.NetlinkGroup{
+		netfilter.GroupCTNew,
+		netfilter.GroupCTUpdate,
+		netfilter.GroupCTDestroy,
+	})
 	require.NoError(t, err)
 
-	// Watch for listen channel errors in the background
 	go func() {
 		err, ok := <-errChan
-		if ok {
-			opErr, ok := errors.Cause(err).(*netlink.OpError)
-			require.True(t, ok)
-			require.EqualError(t, opErr.Err, "recvmsg: bad file descriptor")
+		if !ok {
+			return
 		}
+		require.NoError(t, err)
 	}()
+	defer close(errChan)
 
-	numFlows := 100
-
-	var f Flow
 	var warn bool
 
-	for i := 1; i <= numFlows; i++ {
-
-		// Create the Flow
-		f = NewFlow(
-			17, 0,
-			net.ParseIP("2a00:1450:400e:804::200e"),
-			net.ParseIP("2a00:1450:400e:804::200f"),
-			1234, uint16(i), 120, 0,
+	ip := netip.MustParseAddr("::f00")
+	for _, proto := range []uint8{unix.IPPROTO_TCP, unix.IPPROTO_UDP, unix.IPPROTO_DCCP, unix.IPPROTO_SCTP} {
+		// Create the Flow.
+		f := NewFlow(
+			proto, 0,
+			ip, ip, 123, 123,
+			120, 0,
 		)
-		err = sc.Create(f)
-		require.NoError(t, err, "creating IPv6 flow", i)
+		require.NoError(t, sc.Create(f))
 
-		// Read a new event from the channel
+		// Read a new event from the channel.
 		re := <-ev
 
 		// Validate new event attributes
@@ -73,31 +67,32 @@ func TestConnListen(t *testing.T) {
 		} else {
 			assert.Equal(t, EventNew, re.Type)
 		}
-		assert.Equal(t, f.TupleOrig.Proto.DestinationPort, re.Flow.TupleOrig.Proto.DestinationPort)
+		assert.Equal(t, ip, re.Flow.TupleOrig.IP.SourceAddress)
 
-		// Update the flow
+		// Update the Flow.
 		f.Timeout = 240
-		err = sc.Update(f)
-		require.NoError(t, err)
+		require.NoError(t, sc.Update(f))
 
-		// Read an update event from the channel
+		// Read an update event from the channel.
 		re = <-ev
 
-		// Validate update event attributes
+		// Validate update event attributes.
 		assert.Equal(t, EventUpdate, re.Type)
-		assert.Equal(t, f.TupleOrig.Proto.DestinationPort, re.Flow.TupleOrig.Proto.DestinationPort)
+		assert.Equal(t, ip, re.Flow.TupleOrig.IP.SourceAddress)
 
 		// Compare the timeout on the connection, but within a 2-second window.
 		assert.GreaterOrEqual(t, re.Flow.Timeout, f.Timeout-2, "timeout")
+
+		// Delete the Flow.
+		require.NoError(t, sc.Delete(f))
+
+		// Read destroy event from the channel.
+		re = <-ev
+		assert.Equal(t, EventDestroy, re.Type)
+		assert.Equal(t, ip, re.Flow.TupleOrig.IP.SourceAddress)
 	}
 
-	// Generate an event to unblock the listen worker goroutine
-	go func() {
-		f.Timeout = 1
-		_ = sc.Update(f)
-	}()
-
-	// Close the sockets
+	// Close the sockets, interrupting any blocked listeners.
 	assert.NoError(t, lc.Close())
 	assert.NoError(t, sc.Close())
 }
@@ -108,10 +103,7 @@ func TestConnListenError(t *testing.T) {
 
 	// Too few listen workers
 	_, err = c.Listen(make(chan Event), 0, nil)
-	require.EqualError(t, err, "invalid worker count 0")
-
-	_, err = c.Listen(make(chan Event), 1, nil)
-	require.EqualError(t, err, "need one or more multicast groups to join")
+	require.ErrorIs(t, err, errNoWorkers)
 
 	// Successfully join a multicast group
 	_, err = c.Listen(make(chan Event), 1, netfilter.GroupsCT)
@@ -119,5 +111,5 @@ func TestConnListenError(t *testing.T) {
 
 	// Fail when joining another multicast group
 	_, err = c.Listen(make(chan Event), 1, netfilter.GroupsCT)
-	require.EqualError(t, err, "Conn has existing listeners, open another to listen on more groups")
+	require.ErrorIs(t, err, errConnHasListeners)
 }

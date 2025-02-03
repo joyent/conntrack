@@ -2,16 +2,20 @@ package conntrack
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/mdlayher/netlink"
 	"github.com/pkg/errors"
 	"github.com/ti-mo/netfilter"
+	"golang.org/x/sys/unix"
 )
 
 // Conn represents a Netlink connection to the Netfilter
 // subsystem and implements all Conntrack actions.
 type Conn struct {
 	conn *netfilter.Conn
+
+	workers sync.WaitGroup
 }
 
 // DumpOptions is passed as an option to `Dump`-related methods to modify their behaviour.
@@ -28,12 +32,21 @@ func Dial(config *netlink.Config) (*Conn, error) {
 		return nil, err
 	}
 
-	return &Conn{c}, nil
+	return &Conn{conn: c}, nil
 }
 
 // Close closes a Conn.
+//
+// If any workers were started using [Conn.Listen], blocks until all have
+// terminated.
 func (c *Conn) Close() error {
-	return c.conn.Close()
+	if err := c.conn.Close(); err != nil {
+		return err
+	}
+
+	c.workers.Wait()
+
+	return nil
 }
 
 // SetOption enables or disables a netlink socket option for the Conn.
@@ -72,10 +85,11 @@ func (c *Conn) SetWriteBuffer(bytes int) error {
 // evChan consumers need to be able to keep up with the Event producers. When the channel is full,
 // messages will pile up in the Netlink socket's buffer, putting the socket at risk of being closed
 // by the kernel when it eventually fills up.
+//
+// Closing the Conn makes all workers terminate silently.
 func (c *Conn) Listen(evChan chan<- Event, numWorkers uint8, groups []netfilter.NetlinkGroup) (chan error, error) {
-
 	if numWorkers == 0 {
-		return nil, errors.Errorf(errWorkerCount, numWorkers)
+		return nil, errNoWorkers
 	}
 
 	// Prevent Listen() from being called twice on the same Conn.
@@ -101,16 +115,34 @@ func (c *Conn) Listen(evChan chan<- Event, numWorkers uint8, groups []netfilter.
 
 // eventWorker is a worker function that decodes Netlink messages into Events.
 func (c *Conn) eventWorker(workerID uint8, evChan chan<- Event, errChan chan<- error) {
-
 	var err error
 	var recv []netlink.Message
 	var ev Event
 
+	c.workers.Add(1)
+	defer c.workers.Done()
+
 	for {
-		// Receive data from the Netlink socket
+		// Receive data from the Netlink socket.
 		recv, err = c.conn.Receive()
+
+		// If the Conn gets closed while blocked in Receive(), Go's runtime poller
+		// will return an src/internal/poll.ErrFileClosing. Since we cannot match
+		// the underlying error using errors.Is(), retrieve it from the netlink.OpErr.
+		var opErr *netlink.OpError
+		if errors.As(err, &opErr) {
+			if opErr.Err.Error() == "use of closed file" {
+				return
+			}
+		}
+
+		// Underlying fd has been closed, exit receive loop.
+		if errors.Is(err, unix.EBADF) {
+			return
+		}
+
 		if err != nil {
-			errChan <- errors.Wrap(err, fmt.Sprintf(errWorkerReceive, workerID))
+			errChan <- fmt.Errorf("Receive() netlink error, closing worker %d: %w", workerID, err)
 			return
 		}
 
@@ -122,7 +154,7 @@ func (c *Conn) eventWorker(workerID uint8, evChan chan<- Event, errChan chan<- e
 
 		// Decode event and send on channel
 		ev = *new(Event)
-		err := ev.unmarshal(recv[0])
+		err := ev.Unmarshal(recv[0])
 		if err != nil {
 			errChan <- err
 			return
@@ -387,7 +419,6 @@ func (c *Conn) Get(f Flow) (Flow, error) {
 // SynProxy, Labels. All other attributes are immutable past the point of creation.
 // See the ctnetlink_change_conntrack() kernel function for exact behaviour.
 func (c *Conn) Update(f Flow) error {
-
 	// Kernel rejects updates with a master tuple set
 	if f.TupleMaster.filled() {
 		return errUpdateMaster
@@ -427,7 +458,6 @@ func (c *Conn) Update(f Flow) error {
 // based on the original and reply tuple. When the Flow's ID field is filled, it must match the
 // ID on the connection returned from the tuple lookup, or the delete will fail.
 func (c *Conn) Delete(f Flow) error {
-
 	attrs, err := f.marshal()
 	if err != nil {
 		return err

@@ -1,7 +1,7 @@
 package conntrack
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,11 +21,10 @@ func TestProtoLookup(t *testing.T) {
 }
 
 func TestEventString(t *testing.T) {
-
 	tpl := Tuple{
 		IP: IPTuple{
-			SourceAddress:      net.IPv4(1, 2, 3, 4),
-			DestinationAddress: net.ParseIP("fe80::1"),
+			SourceAddress:      netip.MustParseAddr("1.2.3.4"),
+			DestinationAddress: netip.MustParseAddr("fe80::1"),
 		},
 		Proto: ProtoTuple{
 			SourcePort:      54321,
@@ -61,7 +60,10 @@ func TestEventString(t *testing.T) {
 	ef.Flow.SecurityContext = "selinux_t"
 
 	assert.Equal(t,
-		"[EventUnknown] (Unreplied) Timeout: 0, <0, Src: 1.2.3.4:54321, Dst: [fe80::1]:80>, Zone 0, Acct: [orig: 1 pkts/42 B] [reply: 0 pkts/0 B], Label: <0xf0f0/0xffff>, Mark: <0xf000baaa>, SeqAdjOrig: [dir: orig, pos: 42, before: 80, after: 747811], SeqAdjReply: [dir: reply, pos: 889999, before: 123, after: 456], SecCtx: selinux_t",
+		"[EventUnknown] (Unreplied) Timeout: 0, <0, Src: 1.2.3.4:54321, Dst: [fe80::1]:80>, "+
+			"Zone 0, Acct: [orig: 1 pkts/42 B] [reply: 0 pkts/0 B], Label: <0xf0f0/0xffff>, "+
+			"Mark: <0xf000baaa>, SeqAdjOrig: [dir: orig, pos: 42, before: 80, after: 747811], "+
+			"SeqAdjReply: [dir: reply, pos: 889999, before: 123, after: 456], SecCtx: selinux_t",
 		ef.String())
 
 	// Event with Expect
@@ -74,12 +76,14 @@ func TestEventString(t *testing.T) {
 	ee.Expect.HelpName = "ftp"
 	ee.Expect.Class = 0x42
 
-	assert.Equal(t,
-		"[EventExpDestroy] Timeout: 0, Master: <0, Src: 1.2.3.4:54321, Dst: [fe80::1]:80>, Tuple: <0, Src: 1.2.3.4:54321, Dst: [fe80::1]:80>, Mask: <0, Src: 1.2.3.4:54321, Dst: [fe80::1]:80>, Zone: 0, Helper: 'ftp', Class: 0x42",
+	assert.Equal(t, "[EventExpDestroy] Timeout: 0, Master: <0, Src: 1.2.3.4:54321, Dst: [fe80::1]:80>, "+
+		"Tuple: <0, Src: 1.2.3.4:54321, Dst: [fe80::1]:80>, Mask: <0, Src: 1.2.3.4:54321, Dst: [fe80::1]:80>, "+
+		"Zone: 0, Helper: 'ftp', Class: 0x42",
 		ee.String())
 }
 
 func TestStatsString(t *testing.T) {
 	s := Stats{CPUID: 42, Found: 2, SearchRestart: 999}
-	assert.Equal(t, "<CPU 42 - Found: 2, Invalid: 0, Ignore: 0, Insert: 0, InsertFailed: 0, Drop: 0, EarlyDrop: 0, Error: 0, SearchRestart: 999>", s.String())
+	assert.Equal(t, "<CPU 42 - Found: 2, Invalid: 0, Ignore: 0, Insert: 0, InsertFailed: 0, "+
+		"Drop: 0, EarlyDrop: 0, Error: 0, SearchRestart: 999>", s.String())
 }

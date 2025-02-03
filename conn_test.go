@@ -17,16 +17,7 @@ import (
 	"github.com/ti-mo/netfilter"
 )
 
-func TestConnDialError(t *testing.T) {
-
-	// Attempt to open a Netlink socket into a netns that is highly unlikely
-	// to exist, so we can catch an error from Dial.
-	_, err := conntrack.Dial(&netlink.Config{NetNS: 1337})
-	assert.EqualError(t, err, "setns: bad file descriptor")
-}
-
 func TestConnBufferSizes(t *testing.T) {
-
 	c, err := conntrack.Dial(nil)
 	require.NoError(t, err, "dialing conn")
 
@@ -46,8 +37,8 @@ func ExampleConn_createUpdateFlow() {
 	// Set up a new Flow object using a given set of attributes.
 	f := conntrack.NewFlow(
 		17, 0,
-		net.ParseIP("2a00:1450:400e:804::200e"),
-		net.ParseIP("2a00:1450:400e:804::200f"),
+		netip.MustParseAddr("2a00:1450:400e:804::200e"),
+		netip.MustParseAddr("2a00:1450:400e:804::200f"),
 		1234, 80, 120, 0,
 	)
 
@@ -84,12 +75,12 @@ func ExampleConn_dumpFilter() {
 	}
 
 	f1 := conntrack.NewFlow(
-		6, 0, net.IPv4(1, 2, 3, 4), net.IPv4(5, 6, 7, 8),
+		6, 0, netip.MustParseAddr("1.2.3.4"), netip.MustParseAddr("5.6.7.8"),
 		1234, 80, 120, 0x00ff, // Set a connection mark
 	)
 
 	f2 := conntrack.NewFlow(
-		17, 0, net.ParseIP("2a00:1450:400e:804::200e"), net.ParseIP("2a00:1450:400e:804::200f"),
+		17, 0, netip.MustParseAddr("2a00:1450:400e:804::200e"), netip.MustParseAddr("2a00:1450:400e:804::200f"),
 		1234, 80, 120, 0xff00, // Set a connection mark
 	)
 
@@ -128,12 +119,12 @@ func ExampleConn_flushFilter() {
 	}
 
 	f1 := conntrack.NewFlow(
-		6, 0, net.IPv4(1, 2, 3, 4), net.IPv4(5, 6, 7, 8),
+		6, 0, netip.MustParseAddr("1.2.3.4"), netip.MustParseAddr("5.6.7.8"),
 		1234, 80, 120, 0x00ff, // Set a connection mark
 	)
 
 	f2 := conntrack.NewFlow(
-		17, 0, net.ParseIP("2a00:1450:400e:804::200e"), net.ParseIP("2a00:1450:400e:804::200f"),
+		17, 0, netip.MustParseAddr("2a00:1450:400e:804::200e"), netip.MustParseAddr("2a00:1450:400e:804::200f"),
 		1234, 80, 120, 0xff00, // Set a connection mark
 	)
 
@@ -167,7 +158,7 @@ func ExampleConn_delete() {
 	}
 
 	f := conntrack.NewFlow(
-		6, 0, net.IPv4(1, 2, 3, 4), net.IPv4(5, 6, 7, 8),
+		6, 0, netip.MustParseAddr("1.2.3.4"), netip.MustParseAddr("5.6.7.8"),
 		1234, 80, 120, 0,
 	)
 
