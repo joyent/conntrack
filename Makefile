@@ -22,6 +22,11 @@ label:
 dump:
 	sudo go test -v -run TestDump
 
+update:
+	go test -v   -c  -o conn_dump 
+	#sudo go test -v -run TestUpdate
+	scp ./conn_dump lb9:~/
+
 .PHONY: testv
 testv:
 	go test -v -race ./...

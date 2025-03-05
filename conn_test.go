@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
-	"net"
 	"net/netip"
 	"testing"
 	"time"
@@ -17,7 +16,14 @@ import (
 	"github.com/ti-mo/netfilter"
 )
 
-func TestConnBufferSizes(t *testing.T) {
+func TestMain(t *testing.T) {
+	//testConnBufferSizes(t)
+	//testLabel(t)
+	testDump(t)
+	//testUpdate(t)
+}
+
+func testConnBufferSizes(t *testing.T) {
 	c, err := conntrack.Dial(nil)
 	require.NoError(t, err, "dialing conn")
 
@@ -209,7 +215,7 @@ func ExampleConn_listen() {
 	log.Print(<-errCh)
 }
 
-func TestLabel(t *testing.T) {
+func testLabel(t *testing.T) {
 	// Open a Conntrack connection.
 	c, err := conntrack.Dial(nil)
 	if err != nil {
@@ -247,14 +253,17 @@ func TestLabel(t *testing.T) {
 	dst := uf.TupleOrig.IP.DestinationAddress.String()
 	mark := uint32(1111)
 
+	saddr, _ := netip.ParseAddr(src)
+	daddr, _ := netip.ParseAddr(dst)
+
 	timestamp := uint32(time.Now().Unix())
 	fmt.Printf("%d \n", timestamp)
 
 	f := conntrack.NewFlow(
 		uf.TupleOrig.Proto.Protocol,
 		0,
-		net.ParseIP(src),
-		net.ParseIP(dst),
+		saddr,
+		daddr,
 		uf.TupleOrig.Proto.SourcePort,
 		uf.TupleOrig.Proto.DestinationPort,
 		0,
@@ -301,7 +310,7 @@ func TestLabel(t *testing.T) {
 	fmt.Printf("### 3. get flow:%+v \n", qf)
 }
 
-func TestDump(t *testing.T) {
+func testDump(t *testing.T) {
 	// Open a Conntrack connection.
 	c, err := conntrack.Dial(nil)
 	if err != nil {
@@ -316,10 +325,14 @@ func TestDump(t *testing.T) {
 
 	var i int
 	for _, f := range df {
-		if f.TupleOrig.Proto.Protocol == 1 {
-			i++
-			fmt.Printf("### %d: flow:%+v \n", i, f)
-		}
+		fmt.Printf("### %d: flow:%+v \n", i, f)
+
+		/*
+			if f.TupleOrig.Proto.Protocol == 1 {
+				i++
+				fmt.Printf("### %d: flow:%+v \n", i, f)
+			}
+		*/
 	}
 }
 
@@ -447,7 +460,7 @@ func updateCt(conn *conntrack.Conn, uf *conntrack.Flow) {
 }
 
 func testUpdate(t *testing.T) {
-	fmt.Printf("Start TestMain\n")
+	fmt.Printf("Start TestUpdate\n")
 
 	eventConn, err := conntrack.Dial(nil)
 	if err != nil {
@@ -477,7 +490,7 @@ func testUpdate(t *testing.T) {
 		case <-errChan:
 		case e := <-ev:
 			if e.Type == conntrack.EventNew && e.Flow != nil {
-				//fmt.Printf("new event: %+v\n", e.Flow)
+				fmt.Printf("new event: %+v\n", e.Flow)
 				updateCt(conn, e.Flow)
 			}
 		}
