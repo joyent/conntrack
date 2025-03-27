@@ -176,6 +176,7 @@ const (
 	ctaProtoInfoTCPWScaleReply                            // CTA_PROTOINFO_TCP_WSCALE_REPLY
 	ctaProtoInfoTCPFlagsOriginal                          // CTA_PROTOINFO_TCP_FLAGS_ORIGINAL
 	ctaProtoInfoTCPFlagsReply                             // CTA_PROTOINFO_TCP_FLAGS_REPLY
+	ctaProtoInfoTCPSeqTrack                               // CTA_PROTOINFO_TCP_MAX
 )
 
 // protoInfoDCCPType describes the kind of DCCP protocol info attribute in this container.

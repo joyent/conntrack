@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/josharian/native"
 	"github.com/mdlayher/netlink"
 	"github.com/ti-mo/netfilter"
 )
@@ -123,6 +124,57 @@ func (pi ProtoInfo) marshal() netfilter.Attribute {
 	return nfa
 }
 
+type ProtoInfoTcpSeqTrack struct {
+	TdEnd      uint32
+	TdMaxEnd   uint32
+	TdMaxWin   uint32
+	TdMaxAck   uint32
+	LastSeq    uint32
+	LastAck    uint32
+	LastEnd    uint32
+	LastWin    uint16
+	LastWScale uint8
+	Dummy      uint8
+}
+
+const (
+	ProtoInfoTCPSeqTrackLen = 32
+)
+
+// unmarshal unmarshals netlink attributes into a ProtoInfoTCP.
+func (seq *ProtoInfoTcpSeqTrack) unmarshal(data []byte) error {
+	endian := native.Endian
+
+	l := len(data)
+	if l != ProtoInfoTCPSeqTrackLen {
+		return fmt.Errorf("Mismatch length ProtoInfoTcpSeqTrack: %d != %d", ProtoInfoTCPSeqTrackLen, l)
+	}
+
+	var n uint32 = 0
+	seq.TdEnd = endian.Uint32(data[n:])
+	n += 4
+	seq.TdMaxEnd = endian.Uint32(data[n:])
+	n += 4
+	seq.TdMaxWin = endian.Uint32(data[n:])
+	n += 4
+	seq.TdMaxAck = endian.Uint32(data[n:])
+	n += 4
+	seq.LastSeq = endian.Uint32(data[n:])
+	n += 4
+	seq.LastAck = endian.Uint32(data[n:])
+	n += 4
+	seq.LastEnd = endian.Uint32(data[n:])
+	n += 4
+	seq.LastWin = endian.Uint16(data[n:])
+	n += 2
+	seq.LastWScale = data[n]
+	n += 1
+	seq.Dummy = data[n]
+	n += 1
+
+	return nil
+}
+
 // A ProtoInfoTCP describes the state of a TCP session in both directions.
 // It contains state, window scale and TCP flags.
 type ProtoInfoTCP struct {
@@ -131,6 +183,7 @@ type ProtoInfoTCP struct {
 	ReplyWindowScale    uint8
 	OriginalFlags       uint16
 	ReplyFlags          uint16
+	SeqTrack            ProtoInfoTcpSeqTrack
 }
 
 // unmarshal unmarshals netlink attributes into a ProtoInfoTCP.
@@ -157,6 +210,11 @@ func (tpi *ProtoInfoTCP) unmarshal(ad *netlink.AttributeDecoder) error {
 			tpi.OriginalFlags = ad.Uint16()
 		case ctaProtoInfoTCPFlagsReply:
 			tpi.ReplyFlags = ad.Uint16()
+		case ctaProtoInfoTCPSeqTrack:
+			data := ad.Bytes()
+			if err := tpi.SeqTrack.unmarshal(data); err != nil {
+				return fmt.Errorf("TCP_SEQ Info: err=%v", err)
+			}
 		default:
 			return fmt.Errorf("child type %d: %w", ad.Type(), errUnknownAttribute)
 		}
