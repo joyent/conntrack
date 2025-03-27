@@ -326,6 +326,9 @@ func testDump(t *testing.T) {
 	var i int
 	for _, f := range df {
 		fmt.Printf("### %d: flow:%+v \n", i, f)
+		if f.ProtoInfo.TCP != nil {
+			fmt.Printf("##### TCP:%+v \n", f.ProtoInfo.TCP)
+		}
 
 		/*
 			if f.TupleOrig.Proto.Protocol == 1 {
