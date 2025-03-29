@@ -183,7 +183,7 @@ type ProtoInfoTCP struct {
 	ReplyWindowScale    uint8
 	OriginalFlags       uint16
 	ReplyFlags          uint16
-	SeqTrack            ProtoInfoTcpSeqTrack
+	SeqTrack            *ProtoInfoTcpSeqTrack
 }
 
 // unmarshal unmarshals netlink attributes into a ProtoInfoTCP.
@@ -211,8 +211,10 @@ func (tpi *ProtoInfoTCP) unmarshal(ad *netlink.AttributeDecoder) error {
 		case ctaProtoInfoTCPFlagsReply:
 			tpi.ReplyFlags = ad.Uint16()
 		case ctaProtoInfoTCPSeqTrack:
+			tpi.SeqTrack = &ProtoInfoTcpSeqTrack{}
 			data := ad.Bytes()
 			if err := tpi.SeqTrack.unmarshal(data); err != nil {
+				tpi.SeqTrack = nil
 				return fmt.Errorf("TCP_SEQ Info: err=%v", err)
 			}
 		default:
