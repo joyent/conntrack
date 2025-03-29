@@ -196,6 +196,11 @@ func (c *Conn) Dump(opts *DumpOptions) ([]Flow, error) {
 // DumpFilter gets all Conntrack connections from the kernel in the form of a list
 // of Flow objects, but only returns Flows matching the connmark specified in the Filter parameter.
 func (c *Conn) DumpFilter(f Filter, opts *DumpOptions) ([]Flow, error) {
+	var attrs []netfilter.Attribute
+	if f != nil {
+		attrs = f.Marshal()
+	}
+
 	msgType := ctGet
 	if opts != nil && opts.ZeroCounters {
 		msgType = ctGetCtrZero
@@ -208,7 +213,7 @@ func (c *Conn) DumpFilter(f Filter, opts *DumpOptions) ([]Flow, error) {
 			Family:      netfilter.ProtoUnspec, // ProtoUnspec dumps both IPv4 and IPv6
 			Flags:       netlink.Request | netlink.Dump,
 		},
-		f.marshal())
+		attrs)
 
 	if err != nil {
 		return nil, err
@@ -281,7 +286,7 @@ func (c *Conn) FlushFilter(f Filter) error {
 			Family:      netfilter.ProtoUnspec, // Family is ignored for flush
 			Flags:       netlink.Request | netlink.Acknowledge,
 		},
-		f.marshal())
+		f.Marshal())
 
 	if err != nil {
 		return err
