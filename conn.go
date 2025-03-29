@@ -2,6 +2,7 @@ package conntrack
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 
 	"github.com/mdlayher/netlink"
@@ -193,11 +194,23 @@ func (c *Conn) Dump(opts *DumpOptions) ([]Flow, error) {
 	return unmarshalFlows(nlm)
 }
 
+func IsNil(v interface{}) bool {
+	if v == nil {
+		return true
+	}
+	val := reflect.ValueOf(v)
+	switch val.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
+		return val.IsNil()
+	}
+	return false
+}
+
 // DumpFilter gets all Conntrack connections from the kernel in the form of a list
 // of Flow objects, but only returns Flows matching the connmark specified in the Filter parameter.
 func (c *Conn) DumpFilter(f Filter, opts *DumpOptions) ([]Flow, error) {
 	var attrs []netfilter.Attribute
-	if f != nil {
+	if !IsNil(f) {
 		attrs = f.Marshal()
 	}
 
@@ -278,6 +291,10 @@ func (c *Conn) Flush() error {
 // FlushFilter deletes all entries from the Conntrack table matching a given Filter.
 // Both IPv4 and IPv6 entries are considered for deletion.
 func (c *Conn) FlushFilter(f Filter) error {
+	var attrs []netfilter.Attribute
+	if !IsNil(f) {
+		attrs = f.Marshal()
+	}
 
 	req, err := netfilter.MarshalNetlink(
 		netfilter.Header{
@@ -286,7 +303,7 @@ func (c *Conn) FlushFilter(f Filter) error {
 			Family:      netfilter.ProtoUnspec, // Family is ignored for flush
 			Flags:       netlink.Request | netlink.Acknowledge,
 		},
-		f.Marshal())
+		attrs)
 
 	if err != nil {
 		return err
