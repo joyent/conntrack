@@ -10,7 +10,7 @@ import (
 
 func TestFilterMarshal(t *testing.T) {
 
-	f := Filter{Mark: 0xf0000000, Mask: 0x0000000f}
+	f := FilterMark{Mark: 0xf0000000, Mask: 0x0000000f}
 	fm := []netfilter.Attribute{
 		{
 			Type: uint16(ctaMark),
@@ -22,5 +22,5 @@ func TestFilterMarshal(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, fm, f.marshal(), "unexpected Filter marshal")
+	assert.Equal(t, fm, f.Marshal(), "unexpected Filter marshal")
 }
