@@ -124,22 +124,91 @@ func (pi ProtoInfo) marshal() netfilter.Attribute {
 	return nfa
 }
 
+//struct ip_ct_tcp_state_vgw {
+//    u_int32_t   td_end;     /* max of seq + len */
+//    u_int32_t   td_maxend;  /* max of ack + max(win, 1) */
+//    u_int32_t   td_maxwin;  /* max(win) */
+//    u_int32_t   td_maxack;  /* max of ack */
+//    u_int8_t    td_scale;   /* window scale factor */
+//    u_int8_t    flags;      /* per direction options */
+//    u_int16_t   dummy;
+//}; // 20 bytes
+//struct ip_ct_tcp_vgw {
+//    // 40 bytes
+//    struct ip_ct_tcp_state_vgw seen[2]; /* connection parameters per direction */
+//    //  24 bytes
+//    u_int8_t    state;      /* state of the connection (enum tcp_conntrack) */
+//    /* For detecting stale connections */
+//    u_int8_t    last_dir;   /* Direction of the last packet (enum ip_conntrack_dir) */
+//    u_int8_t    retrans;    /* Number of retransmitted packets */
+//    u_int8_t    last_index; /* Index of the last packet */
+//    u_int32_t   last_seq;   /* Last sequence number seen in dir */
+//    u_int32_t   last_ack;   /* Last sequence number seen in opposite dir */
+//    u_int32_t   last_end;   /* Last seq + len */
+//    u_int16_t   last_win;   /* Last window advertisement seen in dir */
+//    /* For SYN packets while we may be out-of-sync */
+//    u_int8_t    last_wscale;    /* Last window scaling factor seen */
+//    u_int8_t    last_flags; /* Last flags set */
+//    u_int32_t   dummy;
+//}; // 64 bytes
+
+type TcpSeen struct {
+	TdEnd    uint32
+	TdMaxEnd uint32
+	TdMaxWin uint32
+	TdMaxAck uint32
+	TdScale  uint8
+	Flags    uint8
+	Dummy    uint16
+}
+
 type ProtoInfoTcpSeqTrack struct {
-	TdEnd      uint32
-	TdMaxEnd   uint32
-	TdMaxWin   uint32
-	TdMaxAck   uint32
+	Org        TcpSeen
+	Reply      TcpSeen
+	State      uint8
+	LastDir    uint8
+	Retrans    uint8
+	LastIndex  uint8
 	LastSeq    uint32
 	LastAck    uint32
 	LastEnd    uint32
 	LastWin    uint16
 	LastWScale uint8
-	Dummy      uint8
+	LastFlags  uint8
+	Dummy      uint32
 }
 
 const (
-	ProtoInfoTCPSeqTrackLen = 32
+	ProtoInfoTCPSeqTrackLen = 64
 )
+
+func (seen *TcpSeen) Len() uint32 {
+	return 20
+}
+
+// unmarshal unmarshals netlink attributes into a TcpSeen
+func (seen *TcpSeen) unmarshal(data []byte) error {
+	endian := native.Endian
+
+	var n uint32 = 0
+
+	seen.TdEnd = endian.Uint32(data[n:])
+	n += 4
+	seen.TdMaxEnd = endian.Uint32(data[n:])
+	n += 4
+	seen.TdMaxWin = endian.Uint32(data[n:])
+	n += 4
+	seen.TdMaxAck = endian.Uint32(data[n:])
+	n += 4
+	seen.TdScale = data[n]
+	n += 1
+	seen.Flags = data[n]
+	n += 1
+	seen.Dummy = endian.Uint16(data[n:])
+	n += 2
+
+	return nil
+}
 
 // unmarshal unmarshals netlink attributes into a ProtoInfoTCP.
 func (seq *ProtoInfoTcpSeqTrack) unmarshal(data []byte) error {
@@ -151,14 +220,21 @@ func (seq *ProtoInfoTcpSeqTrack) unmarshal(data []byte) error {
 	}
 
 	var n uint32 = 0
-	seq.TdEnd = endian.Uint32(data[n:])
-	n += 4
-	seq.TdMaxEnd = endian.Uint32(data[n:])
-	n += 4
-	seq.TdMaxWin = endian.Uint32(data[n:])
-	n += 4
-	seq.TdMaxAck = endian.Uint32(data[n:])
-	n += 4
+
+	seq.Org.unmarshal(data[n:])
+	n += seq.Org.Len()
+	seq.Reply.unmarshal(data[n:])
+	n += seq.Reply.Len()
+
+	seq.State = data[n]
+	n += 1
+	seq.LastDir = data[n]
+	n += 1
+	seq.Retrans = data[n]
+	n += 1
+	seq.LastIndex = data[n]
+	n += 1
+
 	seq.LastSeq = endian.Uint32(data[n:])
 	n += 4
 	seq.LastAck = endian.Uint32(data[n:])
@@ -169,8 +245,10 @@ func (seq *ProtoInfoTcpSeqTrack) unmarshal(data []byte) error {
 	n += 2
 	seq.LastWScale = data[n]
 	n += 1
-	seq.Dummy = data[n]
+	seq.LastFlags = data[n]
 	n += 1
+	seq.Dummy = endian.Uint32(data[n:])
+	n += 4
 
 	return nil
 }
