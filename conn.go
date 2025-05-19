@@ -240,6 +240,39 @@ func (c *Conn) DumpFilter(f Filter, opts *DumpOptions) ([]Flow, error) {
 	return unmarshalFlows(nlm)
 }
 
+func (c *Conn) DumpFilters(filters []Filter, opts *DumpOptions) ([]Flow, error) {
+	var attrs []netfilter.Attribute
+	for _, flt := range filters {
+		a := flt.Marshal()
+		attrs = append(attrs, a...)
+	}
+
+	msgType := ctGet
+	if opts != nil && opts.ZeroCounters {
+		msgType = ctGetCtrZero
+	}
+
+	req, err := netfilter.MarshalNetlink(
+		netfilter.Header{
+			SubsystemID: netfilter.NFSubsysCTNetlink,
+			MessageType: netfilter.MessageType(msgType),
+			Family:      netfilter.ProtoUnspec, // ProtoUnspec dumps both IPv4 and IPv6
+			Flags:       netlink.Request | netlink.Dump,
+		},
+		attrs)
+
+	if err != nil {
+		return nil, err
+	}
+
+	nlm, err := c.conn.Query(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return unmarshalFlows(nlm)
+}
+
 // DumpExpect gets all expected Conntrack expectations from the kernel in the form
 // of a list of Expect objects.
 func (c *Conn) DumpExpect() ([]Expect, error) {
