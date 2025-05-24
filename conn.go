@@ -36,6 +36,17 @@ func Dial(config *netlink.Config) (*Conn, error) {
 	return &Conn{conn: c}, nil
 }
 
+// Dial opens a new custom Netlink connection and returns it
+// wrapped in a Conn structure that implements the Conntrack API.
+func DialWithFamily(family int, config *netlink.Config) (*Conn, error) {
+	c, err := netfilter.DialWithFamily(family, config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Conn{conn: c}, nil
+}
+
 // Close closes a Conn.
 //
 // If any workers were started using [Conn.Listen], blocks until all have
