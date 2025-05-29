@@ -45,3 +45,17 @@ func (f FilterZone) Marshal() []netfilter.Attribute {
 		},
 	}
 }
+
+type PacketDumpZone struct {
+	Zone uint16
+}
+
+func (f PacketDumpZone) Marshal() []netfilter.Attribute {
+
+	return []netfilter.Attribute{
+		{
+			Type: uint16(ctaPktDumpZone),
+			Data: netfilter.Uint16Bytes(f.Zone),
+		},
+	}
+}

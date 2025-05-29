@@ -253,6 +253,23 @@ const (
 	ctaExpectNATTuple                       // CTA_EXPECT_NAT_TUPLE
 )
 
+type pktDumpType uint8
+
+// enum ctattr_pkt_dump
+const (
+	ctaPktDumpUnspec    pktDumpType = iota // CTA_PKT_DUMP_UNSPEC
+	ctaPktDumpZone                         // CTA_PKT_DUMP_ZONE
+	ctaPktDumpBpfFilter                    // CTA_PKT_DUMP_BPF_FILTER
+)
+
+type bpfFilterType uint8
+
+const (
+	ctaBpfFltUnspec bpfFilterType = iota
+	ctaBpfFltInstCount
+	ctaBpfFltInst
+)
+
 // cpuStatsType describes the type of CPU-specific conntrack statistics attribute in this container.
 type cpuStatsType uint8
 
