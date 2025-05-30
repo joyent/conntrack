@@ -63,10 +63,12 @@ func (bf BpfFilter) Marshal() []netfilter.Attribute {
 
 // marshal marshals a Tuple to a netfilter.Attribute.
 func (bf BpfFilter) marshal(at uint16) (netfilter.Attribute, error) {
-	// an instruction made of 4 Uint32
-	l := uint16(len(bf.Instructions) / BpfFilterInstructionSize)
-	if l != bf.NumInst {
-		return netfilter.Attribute{}, fmt.Errorf("Invalid Instructions")
+	if bf.NumInst > 0 {
+		// an instruction made of 4 Uint32
+		l := uint16(len(bf.Instructions) / BpfFilterInstructionSize)
+		if l != bf.NumInst {
+			return netfilter.Attribute{}, fmt.Errorf("Invalid Instructions")
+		}
 	}
 
 	nfa := netfilter.Attribute{Type: at, Nested: true, Children: make([]netfilter.Attribute, 2)}
@@ -75,13 +77,17 @@ func (bf BpfFilter) marshal(at uint16) (netfilter.Attribute, error) {
 		Type: uint16(ctaBpfFltInstCount), Data: netfilter.Uint16Bytes(bf.NumInst),
 	}
 
-	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.BigEndian, bf.Instructions)
-	if err != nil {
-		return netfilter.Attribute{}, err
-	}
+	if bf.NumInst > 0 {
+		buf := new(bytes.Buffer)
+		err := binary.Write(buf, binary.BigEndian, bf.Instructions)
+		if err != nil {
+			return netfilter.Attribute{}, err
+		}
 
-	nfa.Children[1] = netfilter.Attribute{Type: uint16(ctaBpfFltInst), Data: buf.Bytes()}
+		nfa.Children[1] = netfilter.Attribute{Type: uint16(ctaBpfFltInst), Data: buf.Bytes()}
+	} else {
+		nfa.Children[1] = netfilter.Attribute{Type: uint16(ctaBpfFltInst)}
+	}
 
 	return nfa, nil
 }

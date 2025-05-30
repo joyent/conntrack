@@ -38,6 +38,14 @@ const (
 	ctExpGetStatsCPU                       // IPCTNL_MSG_EXP_GET_STATS_CPU
 )
 
+type drvCfgMessageType netfilter.MessageType
+
+// enum ctnl_drv_config_msg_types
+const (
+	drvCfgSet drvCfgMessageType = iota // IPCTNL_MSG_DRV_CONFIG_SET
+	drvCfgGet                          // IPCTNL_MSG_DRV_CONFIG_GET
+)
+
 // attributeType defines the meaning of a root-level Type
 // value of a Conntrack-specific Netfilter attribute.
 type attributeType uint8

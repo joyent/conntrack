@@ -308,15 +308,14 @@ func (c *Conn) DumpExpect() ([]Expect, error) {
 	return unmarshalExpects(nlm)
 }
 
-func (c *Conn) SetPacketDumpConfig(filters []Filter) error {
+func (c *Conn) DriverConfigSet(filters []Filter) error {
 	var attrs []netfilter.Attribute
 	for _, flt := range filters {
 		a := flt.Marshal()
 		attrs = append(attrs, a...)
 	}
 
-	fmt.Printf("### attrs: +%v \n", attrs)
-	msgType := ctExpNew
+	msgType := drvCfgSet
 
 	req, err := netfilter.MarshalNetlink(
 		netfilter.Header{
@@ -325,7 +324,6 @@ func (c *Conn) SetPacketDumpConfig(filters []Filter) error {
 			//Family:      netfilter.ProtoUnspec, // ProtoUnspec dumps both IPv4 and IPv6
 			Family: netfilter.ProtoIPv4,
 			Flags:  netlink.Request | netlink.Acknowledge,
-			//Flags: netlink.Request | netlink.Dump,
 		},
 		attrs)
 
