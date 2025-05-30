@@ -253,13 +253,13 @@ const (
 	ctaExpectNATTuple                       // CTA_EXPECT_NAT_TUPLE
 )
 
-type pktDumpType uint8
+type drvCfgType uint8
 
-// enum ctattr_pkt_dump
+// enum ctattr_drv_cfg
 const (
-	ctaPktDumpUnspec    pktDumpType = iota // CTA_PKT_DUMP_UNSPEC
-	ctaPktDumpZone                         // CTA_PKT_DUMP_ZONE
-	ctaPktDumpBpfFilter                    // CTA_PKT_DUMP_BPF_FILTER
+	ctaDrvCfgUnspec    drvCfgType = iota // CTA_DRV_CONFIG_UNSPEC
+	ctaDrvCfgZone                        // CTA_DRV_CONFIG_ZONE
+	ctaDrvCfgBpfFilter                   // CTA_DRV_CONFIG_BPF_FILTER
 )
 
 type bpfFilterType uint8
@@ -319,4 +319,12 @@ var _ = []uint8{
 	uint8(ctaHelpUnspec), uint8(ctaCountersUnspec), uint8(ctaTimestampUnspec),
 	uint8(ctaSecCtxUnspec), uint8(ctaProtoInfoTCPUnspec), uint8(ctaProtoInfoDCCPUnspec),
 	uint8(ctaProtoInfoSCTPUnspec), uint8(ctaSeqAdjUnspec), uint8(ctaSynProxyUnspec),
+}
+
+func GetAttrConntrackZone() uint16 {
+	return uint16(ctaZone)
+}
+
+func GetAttrDriverCfgZone() uint16 {
+	return uint16(ctaDrvCfgZone)
 }

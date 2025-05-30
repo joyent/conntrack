@@ -55,7 +55,7 @@ func (bf BpfFilter) unmarshal(ad *netlink.AttributeDecoder) error {
 }
 
 func (bf BpfFilter) Marshal() []netfilter.Attribute {
-	att, _ := bf.marshal(uint16(ctaPktDumpBpfFilter))
+	att, _ := bf.marshal(uint16(ctaDrvCfgBpfFilter))
 	return []netfilter.Attribute{
 		att,
 	}
