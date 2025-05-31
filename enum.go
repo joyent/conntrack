@@ -253,25 +253,6 @@ const (
 	ctaExpectNATTuple                       // CTA_EXPECT_NAT_TUPLE
 )
 
-/*
-type drvCfgType uint8
-
-// enum ctattr_drv_cfg
-const (
-	ctaDrvCfgUnspec    drvCfgType = iota // CTA_DRV_CONFIG_UNSPEC
-	ctaDrvCfgZone                        // CTA_DRV_CONFIG_ZONE
-	ctaDrvCfgBpfFilter                   // CTA_DRV_CONFIG_BPF_FILTER
-)
-
-type bpfFilterType uint8
-
-const (
-	ctaBpfFltUnspec bpfFilterType = iota
-	ctaBpfFltInstCount
-	ctaBpfFltInst
-)
-*/
-
 // cpuStatsType describes the type of CPU-specific conntrack statistics attribute in this container.
 type cpuStatsType uint8
 
