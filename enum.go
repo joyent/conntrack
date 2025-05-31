@@ -38,14 +38,6 @@ const (
 	ctExpGetStatsCPU                       // IPCTNL_MSG_EXP_GET_STATS_CPU
 )
 
-type drvCfgMessageType netfilter.MessageType
-
-// enum ctnl_drv_config_msg_types
-const (
-	drvCfgSet drvCfgMessageType = iota // IPCTNL_MSG_DRV_CONFIG_SET
-	drvCfgGet                          // IPCTNL_MSG_DRV_CONFIG_GET
-)
-
 // attributeType defines the meaning of a root-level Type
 // value of a Conntrack-specific Netfilter attribute.
 type attributeType uint8
@@ -261,6 +253,7 @@ const (
 	ctaExpectNATTuple                       // CTA_EXPECT_NAT_TUPLE
 )
 
+/*
 type drvCfgType uint8
 
 // enum ctattr_drv_cfg
@@ -277,6 +270,7 @@ const (
 	ctaBpfFltInstCount
 	ctaBpfFltInst
 )
+*/
 
 // cpuStatsType describes the type of CPU-specific conntrack statistics attribute in this container.
 type cpuStatsType uint8
@@ -327,12 +321,4 @@ var _ = []uint8{
 	uint8(ctaHelpUnspec), uint8(ctaCountersUnspec), uint8(ctaTimestampUnspec),
 	uint8(ctaSecCtxUnspec), uint8(ctaProtoInfoTCPUnspec), uint8(ctaProtoInfoDCCPUnspec),
 	uint8(ctaProtoInfoSCTPUnspec), uint8(ctaSeqAdjUnspec), uint8(ctaSynProxyUnspec),
-}
-
-func GetAttrConntrackZone() uint16 {
-	return uint16(ctaZone)
-}
-
-func GetAttrDriverCfgZone() uint16 {
-	return uint16(ctaDrvCfgZone)
 }

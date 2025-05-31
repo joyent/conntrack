@@ -31,15 +31,14 @@ func (f FilterMark) Marshal() []netfilter.Attribute {
 }
 
 type FilterZone struct {
-	AttrId uint16
-	Zone   uint16
+	Zone uint16
 }
 
 // marshal marshals a Filter into a list of netfilter.Attributes.
 func (f FilterZone) Marshal() []netfilter.Attribute {
 	return []netfilter.Attribute{
 		{
-			Type: f.AttrId,
+			Type: uint16(ctaZone),
 			Data: netfilter.Uint16Bytes(f.Zone),
 		},
 	}

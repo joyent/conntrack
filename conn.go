@@ -308,37 +308,6 @@ func (c *Conn) DumpExpect() ([]Expect, error) {
 	return unmarshalExpects(nlm)
 }
 
-func (c *Conn) DriverConfigSet(filters []Filter) error {
-	var attrs []netfilter.Attribute
-	for _, flt := range filters {
-		a := flt.Marshal()
-		attrs = append(attrs, a...)
-	}
-
-	msgType := drvCfgSet
-
-	req, err := netfilter.MarshalNetlink(
-		netfilter.Header{
-			SubsystemID: netfilter.NFSubsysCTNetlinkExp,
-			MessageType: netfilter.MessageType(msgType),
-			//Family:      netfilter.ProtoUnspec, // ProtoUnspec dumps both IPv4 and IPv6
-			Family: netfilter.ProtoIPv4,
-			Flags:  netlink.Request | netlink.Acknowledge,
-		},
-		attrs)
-
-	if err != nil {
-		return err
-	}
-
-	_, err = c.conn.Query(req)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // Flush empties the Conntrack table. Deletes all IPv4 and IPv6 entries.
 func (c *Conn) Flush() error {
 
@@ -665,4 +634,8 @@ func (c *Conn) StatsGlobal() (StatsGlobal, error) {
 	}
 
 	return unmarshalStatsGlobal(msgs[0])
+}
+
+func (c *Conn) RunQuery(req netlink.Message) ([]netlink.Message, error) {
+	return c.conn.Query(req)
 }
