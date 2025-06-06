@@ -635,3 +635,7 @@ func (c *Conn) StatsGlobal() (StatsGlobal, error) {
 
 	return unmarshalStatsGlobal(msgs[0])
 }
+
+func (c *Conn) RunQuery(req netlink.Message) ([]netlink.Message, error) {
+	return c.conn.Query(req)
+}

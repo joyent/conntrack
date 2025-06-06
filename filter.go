@@ -18,7 +18,6 @@ type FilterMark struct {
 
 // marshal marshals a Filter into a list of netfilter.Attributes.
 func (f FilterMark) Marshal() []netfilter.Attribute {
-
 	return []netfilter.Attribute{
 		{
 			Type: uint16(ctaMark),
@@ -37,7 +36,6 @@ type FilterZone struct {
 
 // marshal marshals a Filter into a list of netfilter.Attributes.
 func (f FilterZone) Marshal() []netfilter.Attribute {
-
 	return []netfilter.Attribute{
 		{
 			Type: uint16(ctaZone),
